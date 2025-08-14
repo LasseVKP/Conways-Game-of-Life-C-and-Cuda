@@ -2,8 +2,8 @@
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
-#include "stdlib.h"
 
+// Set window and board sizes
 #define BOARD_SIZE 50
 #define WINDOW_SIZE 1000
 #define CELL_SIZE (WINDOW_SIZE/BOARD_SIZE)
@@ -12,23 +12,18 @@ bool board[BOARD_SIZE][BOARD_SIZE];
 bool previousBoard[BOARD_SIZE][BOARD_SIZE];
 
 void initBoard() {
+    // Randomize all cells
     for (int x = 0; x < BOARD_SIZE; x++) {
         for (int y = 0; y < BOARD_SIZE; y++) {
             board[x][y] = rand() % 2 - 1;
         }
     }
-
-    /* Coordinates for a flying thingy*/
-    /*board[5+5][5] = true;
-    board[6+5][5] = true;
-    board[7+5][5] = true;
-    board[7+5][4] = true;
-    board[6+5][3] = true;*/
 }
 
 void updateBoard() {
     // Copy to a temporary board
     memcpy(previousBoard, board, sizeof(board));
+    // Update the state of all cells (yes this could be optimized by only updating cells that are alive or have alive neighbouring cells)
     for (size_t x = 0; x < BOARD_SIZE; x++)
     {
         for (size_t y = 0; y < BOARD_SIZE; y++)
@@ -57,6 +52,7 @@ void updateBoard() {
             neighbours += previousBoard[x][down];
             neighbours += previousBoard[right][down];
 
+            // Update state based on neighbours
             if(!state && neighbours == 3) {
                 board[x][y] = true;
             } else if(state && (neighbours < 2 || neighbours > 3)) {
@@ -68,6 +64,7 @@ void updateBoard() {
 
 }
 
+// Draw all the cells
 void drawBoard(){
     for (size_t x = 0; x < BOARD_SIZE; x++)
     {
@@ -90,9 +87,9 @@ int main(void) {
 
     // Main loop
     while (!WindowShouldClose()) {
-        // Clear and update
+        // Update and draw
         BeginDrawing();
-        ClearBackground(RAYWHITE);
+        ClearBackground(WHITE);
         updateBoard();
         drawBoard();
         EndDrawing();
