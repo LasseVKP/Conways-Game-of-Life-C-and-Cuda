@@ -92,11 +92,11 @@ void drawBoard(){
 
 // Draw population count and generation count
 void drawLabel(){
-    char populationText[20];
+    char populationText[24];
     sprintf(populationText, "Population: %d", population);
     DrawText(populationText, 5, 5, TEXT_SIZE, TEXT_COLOR);
 
-    char generationText[20];
+    char generationText[24];
     sprintf(generationText, "Generation: %d", generation);
     DrawText(generationText, 5, 5 + TEXT_SIZE, TEXT_SIZE, TEXT_COLOR);
 }

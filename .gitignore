@@ -3,3 +3,5 @@ raygui.h
 /include
 conway
 conway.exe
+conwayCuda
+conwayCuda.exe
