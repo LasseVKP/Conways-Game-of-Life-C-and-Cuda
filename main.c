@@ -12,19 +12,18 @@ bool board[BOARD_SIZE][BOARD_SIZE];
 bool previousBoard[BOARD_SIZE][BOARD_SIZE];
 
 void initBoard() {
-    /*for (int x = 0; x < BOARD_SIZE; x++) {
+    for (int x = 0; x < BOARD_SIZE; x++) {
         for (int y = 0; y < BOARD_SIZE; y++) {
             board[x][y] = rand() % 2 - 1;
         }
-    }*/
+    }
 
-   /* Coordinates for a flying thingy*/
-   board[5+5][5] = true;
-   board[6+5][5] = true;
-   board[7+5][5] = true;
-   board[7+5][4] = true;
-   board[6+5][3] = true;
-   
+    /* Coordinates for a flying thingy*/
+    /*board[5+5][5] = true;
+    board[6+5][5] = true;
+    board[7+5][5] = true;
+    board[7+5][4] = true;
+    board[6+5][3] = true;*/
 }
 
 void updateBoard() {
@@ -36,18 +35,27 @@ void updateBoard() {
         {
             bool state = previousBoard[x][y];
 
+            // Get adjacent coordinates with wrapping
+            int left = x-1;
+            if(left<0) left = BOARD_SIZE - 1;
+            int right = x+1;
+            if(right >= BOARD_SIZE) right = 0;
+            int up = y-1;
+            if(up < 0) up = BOARD_SIZE - 1;
+            int down = y+1;
+            if(down >= BOARD_SIZE) down = 0;
+
             // Get amount of alive neighbours
             int neighbours = 0;
-            neighbours += previousBoard[((x+1)<BOARD_SIZE) ? x+1 : 0][y];
-            neighbours += previousBoard[((x+1)<BOARD_SIZE) ? x+1 : 0][((y+1)<BOARD_SIZE) ? y+1 : 0];
-            neighbours += previousBoard[((x+1)<BOARD_SIZE) ? x+1 : 0][((y-1)>=0) ? y-1 : BOARD_SIZE];
-
-            neighbours += previousBoard[((x-1)>=0) ? x-1 : BOARD_SIZE][y];
-            neighbours += previousBoard[((x-1)>=0) ? x-1 : BOARD_SIZE][((y+1)<BOARD_SIZE) ? y+1 : 0];
-            neighbours += previousBoard[((x-1)>=0) ? x-1 : BOARD_SIZE][((y-1)>=0) ? y-1 : BOARD_SIZE];
-
-            neighbours += previousBoard[x][((y+1)<BOARD_SIZE) ? y+1 : 0];
-            neighbours += previousBoard[x][((y-1)>=0) ? y-1 : BOARD_SIZE];
+            
+            neighbours += previousBoard[left][up];
+            neighbours += previousBoard[x][up];
+            neighbours += previousBoard[right][up];
+            neighbours += previousBoard[left][y];
+            neighbours += previousBoard[right][y];
+            neighbours += previousBoard[left][down];
+            neighbours += previousBoard[x][down];
+            neighbours += previousBoard[right][down];
 
             if(!state && neighbours == 3) {
                 board[x][y] = true;
