@@ -5,3 +5,5 @@ conway
 conway.exe
 conwayCuda
 conwayCuda.exe
+build-cuda.sh
+build.sh
