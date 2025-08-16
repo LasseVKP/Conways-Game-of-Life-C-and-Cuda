@@ -44,6 +44,39 @@ __global__ void initBoard(bool *board, curandState *states) {
 }
 
 __global__ void updateBoard(bool *board){
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    // Make sure no threads outside cell total do anything
+    if(idx>=BOARD_SIZE*BOARD_SIZE) return;
+
+    // Get coordinates for all the neighbours with wrapping
+    int left = idx - 1;
+    if(idx % BOARD_SIZE == 0) left += BOARD_SIZE;
+    int right = idx + 1;
+    if(idx % BOARD_SIZE == BOARD_SIZE - 1) right -= BOARD_SIZE;
+
+    int up = idx - BOARD_SIZE;
+    if(up < 0) up += BOARD_SIZE * BOARD_SIZE;
+    int down = idx + BOARD_SIZE;
+    if(down >= BOARD_SIZE*BOARD_SIZE) down -= BOARD_SIZE*BOARD_SIZE;
+
+    int upLeft = up - 1;
+    if(up % BOARD_SIZE == 0) upLeft += BOARD_SIZE;
+    int upRight = up + 1;
+    if(up % BOARD_SIZE == BOARD_SIZE - 1) upRight -= BOARD_SIZE;
+        
+    int downLeft = down - 1;
+    if(down % BOARD_SIZE == 0) downLeft += BOARD_SIZE;
+    int downRight = down + 1;
+    if(down % BOARD_SIZE == BOARD_SIZE - 1) downRight -= BOARD_SIZE;
+
+    // Get alive neighbours
+    int neighbours = board[up] + board[down] + board[left] + board[right] + board[upLeft] + board[upRight] + board[downLeft] + board[downRight];
+
+    if(!board[idx] && neighbours == 3) {
+        board[idx] = true;
+    } else if(board[idx] && (neighbours < 2 || neighbours > 3)) {
+        board[idx] = false;
+    }
 
 }
 
@@ -71,7 +104,7 @@ void drawLabel(){
 int main(void) {
     // Open the window
     InitWindow(WINDOW_SIZE, WINDOW_SIZE, "Conway's Game Of Life");
-    SetTargetFPS(2);
+    SetTargetFPS(20);
 
     // Setup randomness on the device
     curandState *d_states;
@@ -97,8 +130,7 @@ int main(void) {
         // Update and draw
         BeginDrawing();
         ClearBackground(WHITE);
-        initBoard<<<BLOCKS,THREADS_PER_BLOCK>>>(d_board, d_states);
-        cudaDeviceSynchronize();
+        updateBoard<<<BLOCKS, THREADS_PER_BLOCK>>>(d_board);
         cudaMemcpy(h_board, d_board, sizeof(bool) * BOARD_SIZE * BOARD_SIZE, cudaMemcpyDeviceToHost);
 
         drawBoard(h_board);
