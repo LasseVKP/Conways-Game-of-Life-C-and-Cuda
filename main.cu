@@ -1,8 +1,14 @@
 //#define BENCHMARKING
 
+#include <curand_kernel.h>
+
 #ifdef BENCHMARKING
 #include <stdio.h>
 #include <time.h>
+
+// Setup benchmark properties
+#define BOARD_SIZE 1000
+#define GENERATIONS 1000000
 #endif
 
 #ifndef BENCHMARKING
@@ -11,37 +17,23 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-#endif
-
-#include <curand_kernel.h>
-
-// Set Board size for benchmarking
-#ifdef BENCHMARKING
-#define BOARD_SIZE 1000
-#endif
+#define BOARD_SIZE 200
 
 // Window properties
-#ifndef BENCHMARKING
-#define BOARD_SIZE 200
 #define WINDOW_SIZE 1000
 #define CELL_SIZE (WINDOW_SIZE/BOARD_SIZE)
 
 // Generation label properties
 #define TEXT_SIZE 48
 #define TEXT_COLOR DARKBLUE
+
+int generation = 0;
 #endif
 
-// One thread per cell
+// Define threads and blocks for sending to device
 #define THREADS BOARD_SIZE*BOARD_SIZE
 #define THREADS_PER_BLOCK 256
 #define BLOCKS (THREADS + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK
-
-// Set amount of generations for  
-#ifdef BENCHMARKING
-#define GENERATIONS 100000
-#endif
-
-int generation = 0;
 
 // Give a randomness state to every thread
 __global__ void initCurand(curandState *states, unsigned long seed){
@@ -50,6 +42,7 @@ __global__ void initCurand(curandState *states, unsigned long seed){
     // Make sure no threads outside cell total do anything
     if(idx>=BOARD_SIZE*BOARD_SIZE) return;
 
+    // Initialize the state for the thread with the seed
     curand_init(seed, idx, 0, &states[idx]);
 }
 
@@ -94,12 +87,12 @@ __global__ void updateBoard(bool *board){
     // Get alive neighbours
     int neighbours = board[up] + board[down] + board[left] + board[right] + board[upLeft] + board[upRight] + board[downLeft] + board[downRight];
 
+    // Update cell state based on Conway's Game of Life rules
     if(!board[idx] && neighbours == 3) {
         board[idx] = true;
     } else if(board[idx] && (neighbours < 2 || neighbours > 3)) {
         board[idx] = false;
     }
-
 }
 
 #ifndef BENCHMARKING
@@ -107,6 +100,7 @@ __global__ void updateBoard(bool *board){
 void drawBoard(bool *board){
     for (size_t i = 0; i < BOARD_SIZE*BOARD_SIZE; i++)
     {
+        // Draw cell if it's alive
         if(board[i]){
             DrawRectangle((i%BOARD_SIZE)*CELL_SIZE, i/BOARD_SIZE*CELL_SIZE, CELL_SIZE, CELL_SIZE, BLACK);
         }
@@ -115,36 +109,32 @@ void drawBoard(bool *board){
 
 // Draw population count and generation count
 void drawLabel(){
+    // Concatenate generation number with label
     char generationText[24];
     sprintf(generationText, "Generation: %d", generation);
+
     DrawText(generationText, 5, 5, TEXT_SIZE, TEXT_COLOR);
 }
 #endif
 
 int main(void) {
-    #ifndef BENCHMARKING
-    // Create the window
-    InitWindow(WINDOW_SIZE, WINDOW_SIZE, "Conway's Game Of Life");
-    SetTargetFPS(20);
-    #endif
-
-    // Setup randomness on the device
+    // Setup randomness on the device threads using time as the seed
     curandState *d_states;
-    cudaError_t err = cudaMalloc((void**)&d_states, sizeof(curandState)*THREADS);
-    if (err != cudaSuccess) printf("cudaMalloc states failed: %s\n", cudaGetErrorString(err));
+    cudaMalloc((void**)&d_states, sizeof(curandState)*THREADS);
     initCurand<<<BLOCKS, THREADS_PER_BLOCK>>>(d_states, time(NULL));
 
-    // Setup the board on the device
-    bool *d_board;
-
     // Allocate the board to the device memory
+    bool *d_board;
     cudaMalloc((void**)&d_board, sizeof(bool)*BOARD_SIZE*BOARD_SIZE);
 
     initBoard<<<BLOCKS, THREADS_PER_BLOCK>>>(d_board, d_states);
 
     #ifndef BENCHMARKING
+    // Create the window
+    InitWindow(WINDOW_SIZE, WINDOW_SIZE, "Conway's Game Of Life");
+    SetTargetFPS(20);
 
-    // Transfer board to host memory
+    // Transfer board to host and draw it
     bool *h_board = (bool*)malloc(sizeof(bool) * BOARD_SIZE * BOARD_SIZE);
     cudaMemcpy(h_board, d_board, sizeof(bool) * BOARD_SIZE * BOARD_SIZE, cudaMemcpyDeviceToHost);
     drawBoard(h_board);
@@ -154,37 +144,43 @@ int main(void) {
         // Update and draw
         BeginDrawing();
         ClearBackground(WHITE);
-        updateBoard<<<BLOCKS, THREADS_PER_BLOCK>>>(d_board);
-        cudaMemcpy(h_board, d_board, sizeof(bool) * BOARD_SIZE * BOARD_SIZE, cudaMemcpyDeviceToHost);
 
+        updateBoard<<<BLOCKS, THREADS_PER_BLOCK>>>(d_board);
+
+        // Transfer board to host and draw it
+        cudaMemcpy(h_board, d_board, sizeof(bool) * BOARD_SIZE * BOARD_SIZE, cudaMemcpyDeviceToHost);
         drawBoard(h_board);
+
         drawLabel();
         EndDrawing();
-        // Increment generation counter and reset population counter
+
         generation++;
     }
 
+    // Deallocate host board
     free(h_board);
+
+    CloseWindow();
     #endif
 
     // Benchmark the program by doing GENERATIONS amount of generations
     #ifdef BENCHMARKING
+    // Start benchmark clock
     clock_t clock_start = clock();
 
+    // Update the board GENERATIONS amount of times
     for(size_t i = 0; i<GENERATIONS; i++){
         updateBoard<<<BLOCKS, THREADS_PER_BLOCK>>>(d_board);
-        cudaDeviceSynchronize();
     }
+    // Wait for all the updates to be done
+    cudaDeviceSynchronize();
 
+    // Stop benchmark and print results
     clock_t clock_end = clock();
     printf("Completed %d generations in %f seconds\n%f generations every second\n", GENERATIONS, (double)(clock_end - clock_start) / CLOCKS_PER_SEC, (double)GENERATIONS / ((double)(clock_end - clock_start) / CLOCKS_PER_SEC));
     #endif
 
-    // Clear allocated memory
+    // Deallocate device board and states
     cudaFree(d_board);
     cudaFree(d_states);
-
-    #ifndef BENCHMARKING
-    CloseWindow();
-    #endif
 }
