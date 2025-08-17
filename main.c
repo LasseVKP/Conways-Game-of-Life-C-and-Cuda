@@ -1,16 +1,31 @@
-// Use raylib and raygui for graphics
+#include <stdlib.h>
+#include <string.h>
+//#define BENCHMARKING
+
+// Defines and includes for graphical version of the program
+#ifndef BENCHMARKING
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
 // Set window and board sizes
-#define BOARD_SIZE 100
+#define BOARD_SIZE 200
 #define WINDOW_SIZE 1000
 #define CELL_SIZE (WINDOW_SIZE/BOARD_SIZE)
 
-// Population and generation label properties
+// Generation label properties
 #define TEXT_SIZE 48
 #define TEXT_COLOR DARKBLUE
+#endif
+
+// Defines and includes for benchmarking version of the program
+#ifdef BENCHMARKING
+#include <stdio.h>
+#include <time.h>
+#define BOARD_SIZE 1000
+#define GENERATIONS 1000
+#endif
+
 
 bool board[BOARD_SIZE][BOARD_SIZE];
 bool previousBoard[BOARD_SIZE][BOARD_SIZE];
@@ -69,6 +84,7 @@ void updateBoard() {
 
 }
 
+#ifndef BENCHMARKING
 // Draw all the cells
 void drawBoard(){
     for (size_t x = 0; x < BOARD_SIZE; x++)
@@ -88,8 +104,10 @@ void drawLabel(){
     sprintf(generationText, "Generation: %d", generation);
     DrawText(generationText, 5, 5, TEXT_SIZE, TEXT_COLOR);
 }
+#endif
 
 int main(void) {
+    #ifndef BENCHMARKING
     // Open the window
     InitWindow(WINDOW_SIZE, WINDOW_SIZE, "Conway's Game Of Life");
     SetTargetFPS(20);
@@ -109,5 +127,18 @@ int main(void) {
         // Increment generation counter and reset population counter
         generation++;
     }
+
     CloseWindow();
+    #endif
+
+    #ifdef BENCHMARKING
+    clock_t clock_start = clock();
+
+    for(size_t i = 0; i<GENERATIONS; i++){
+        updateBoard();
+    }
+
+    clock_t clock_end = clock();
+    printf("Completed %d generations in %f seconds\n%f generations every second\n", GENERATIONS, (double)(clock_end - clock_start) / CLOCKS_PER_SEC, (double)GENERATIONS / ((double)(clock_end - clock_start) / CLOCKS_PER_SEC));
+    #endif
 }
