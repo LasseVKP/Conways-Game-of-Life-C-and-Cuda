@@ -15,16 +15,13 @@
 bool board[BOARD_SIZE][BOARD_SIZE];
 bool previousBoard[BOARD_SIZE][BOARD_SIZE];
 
-int population = 0;
 int generation = 0;
 
 void initBoard() {
     // Randomize all cells and count population
     for (int x = 0; x < BOARD_SIZE; x++) {
         for (int y = 0; y < BOARD_SIZE; y++) {
-            bool state = rand() % 2 - 1;
-            board[x][y] = state;
-            population += state;
+            board[x][y] = rand() % 2 - 1;
         }
     }
 }
@@ -64,14 +61,9 @@ void updateBoard() {
             // Update state based on neighbours
             if(!state && neighbours == 3) {
                 board[x][y] = true;
-                state = true;
             } else if(state && (neighbours < 2 || neighbours > 3)) {
                 board[x][y] = false;
-                state = false;
             }
-
-            // Count population
-            population += state;
         }
     }
 
@@ -92,13 +84,9 @@ void drawBoard(){
 
 // Draw population count and generation count
 void drawLabel(){
-    char populationText[24];
-    sprintf(populationText, "Population: %d", population);
-    DrawText(populationText, 5, 5, TEXT_SIZE, TEXT_COLOR);
-
     char generationText[24];
     sprintf(generationText, "Generation: %d", generation);
-    DrawText(generationText, 5, 5 + TEXT_SIZE, TEXT_SIZE, TEXT_COLOR);
+    DrawText(generationText, 5, 5, TEXT_SIZE, TEXT_COLOR);
 }
 
 int main(void) {
@@ -120,7 +108,6 @@ int main(void) {
         EndDrawing();
         // Increment generation counter and reset population counter
         generation++;
-        population = 0;
     }
     CloseWindow();
 }

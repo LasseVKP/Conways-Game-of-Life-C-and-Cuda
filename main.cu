@@ -1,24 +1,46 @@
+//#define BENCHMARKING
+
+#ifdef BENCHMARKING
+#include <stdio.h>
+#include <time.h>
+#endif
+
+#ifndef BENCHMARKING
 // Use raylib and raygui for graphics
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
+
+#endif
+
 #include <curand_kernel.h>
 
-// Set window and board sizes
-#define BOARD_SIZE 100
+// Set Board size for benchmarking
+#ifdef BENCHMARKING
+#define BOARD_SIZE 1000
+#endif
+
+// Window properties
+#ifndef BENCHMARKING
+#define BOARD_SIZE 200
 #define WINDOW_SIZE 1000
 #define CELL_SIZE (WINDOW_SIZE/BOARD_SIZE)
+
+// Generation label properties
+#define TEXT_SIZE 48
+#define TEXT_COLOR DARKBLUE
+#endif
 
 // One thread per cell
 #define THREADS BOARD_SIZE*BOARD_SIZE
 #define THREADS_PER_BLOCK 256
 #define BLOCKS (THREADS + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK
 
-// Population and generation label properties
-#define TEXT_SIZE 48
-#define TEXT_COLOR DARKBLUE
+// Set amount of generations for  
+#ifdef BENCHMARKING
+#define GENERATIONS 100000
+#endif
 
-int population = 0;
 int generation = 0;
 
 // Give a randomness state to every thread
@@ -80,6 +102,7 @@ __global__ void updateBoard(bool *board){
 
 }
 
+#ifndef BENCHMARKING
 // Draw all the cells
 void drawBoard(bool *board){
     for (size_t i = 0; i < BOARD_SIZE*BOARD_SIZE; i++)
@@ -92,19 +115,18 @@ void drawBoard(bool *board){
 
 // Draw population count and generation count
 void drawLabel(){
-    char populationText[24];
-    sprintf(populationText, "Population: %d", population);
-    DrawText(populationText, 5, 5, TEXT_SIZE, TEXT_COLOR);
-
     char generationText[24];
     sprintf(generationText, "Generation: %d", generation);
-    DrawText(generationText, 5, 5 + TEXT_SIZE, TEXT_SIZE, TEXT_COLOR);
+    DrawText(generationText, 5, 5, TEXT_SIZE, TEXT_COLOR);
 }
+#endif
 
 int main(void) {
-    // Open the window
+    #ifndef BENCHMARKING
+    // Create the window
     InitWindow(WINDOW_SIZE, WINDOW_SIZE, "Conway's Game Of Life");
     SetTargetFPS(20);
+    #endif
 
     // Setup randomness on the device
     curandState *d_states;
@@ -119,6 +141,8 @@ int main(void) {
     cudaMalloc((void**)&d_board, sizeof(bool)*BOARD_SIZE*BOARD_SIZE);
 
     initBoard<<<BLOCKS, THREADS_PER_BLOCK>>>(d_board, d_states);
+
+    #ifndef BENCHMARKING
 
     // Transfer board to host memory
     bool *h_board = (bool*)malloc(sizeof(bool) * BOARD_SIZE * BOARD_SIZE);
@@ -138,13 +162,29 @@ int main(void) {
         EndDrawing();
         // Increment generation counter and reset population counter
         generation++;
-        population = 0;
     }
 
-    // Clear allocated memory
     free(h_board);
+    #endif
+
+    // Benchmark the program by doing GENERATIONS amount of generations
+    #ifdef BENCHMARKING
+    clock_t clock_start = clock();
+
+    for(size_t i = 0; i<GENERATIONS; i++){
+        updateBoard<<<BLOCKS, THREADS_PER_BLOCK>>>(d_board);
+        cudaDeviceSynchronize();
+    }
+
+    clock_t clock_end = clock();
+    printf("Completed %d generations in %f seconds\n%f generations every second\n", GENERATIONS, (double)(clock_end - clock_start) / CLOCKS_PER_SEC, (double)GENERATIONS / ((double)(clock_end - clock_start) / CLOCKS_PER_SEC));
+    #endif
+
+    // Clear allocated memory
     cudaFree(d_board);
     cudaFree(d_states);
 
+    #ifndef BENCHMARKING
     CloseWindow();
+    #endif
 }
