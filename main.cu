@@ -1,4 +1,4 @@
-//#define BENCHMARKING
+#define BENCHMARKING
 
 #include <curand_kernel.h>
 
@@ -8,7 +8,7 @@
 
 // Setup benchmark properties
 #define BOARD_SIZE 1000
-#define GENERATIONS 1000000
+#define GENERATIONS 100000
 #endif
 
 #ifndef BENCHMARKING
@@ -165,8 +165,10 @@ int main(void) {
 
     // Benchmark the program by doing GENERATIONS amount of generations
     #ifdef BENCHMARKING
-    // Start benchmark clock
-    clock_t clock_start = clock();
+    struct timespec start, finish;
+    double elapsed;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     // Update the board GENERATIONS amount of times
     for(size_t i = 0; i<GENERATIONS; i++){
@@ -175,9 +177,10 @@ int main(void) {
     // Wait for all the updates to be done
     cudaDeviceSynchronize();
 
-    // Stop benchmark and print results
-    clock_t clock_end = clock();
-    printf("Completed %d generations in %f seconds\n%f generations every second\n", GENERATIONS, (double)(clock_end - clock_start) / CLOCKS_PER_SEC, (double)GENERATIONS / ((double)(clock_end - clock_start) / CLOCKS_PER_SEC));
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("Completed %d generations in %f seconds\n%f generations every second\n", GENERATIONS, elapsed, (double)GENERATIONS / elapsed);
     #endif
 
     // Deallocate device board and states
