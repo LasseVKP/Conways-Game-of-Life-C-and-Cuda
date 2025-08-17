@@ -2,6 +2,10 @@
 #include <string.h>
 //#define BENCHMARKING
 
+// Use a multithreading
+#include <pthread.h>
+#define THREADS 16
+
 // Defines and includes for graphical version of the program
 #ifndef BENCHMARKING
 // Raylib and Raygui for graphics
@@ -18,7 +22,6 @@
 #define TEXT_SIZE 48
 #define TEXT_COLOR DARKBLUE
 int generation = 0;
-
 #endif
 
 // Defines and includes for benchmarking version of the program
@@ -27,7 +30,7 @@ int generation = 0;
 #include <time.h>
 // Set size and generation amount
 #define BOARD_SIZE 1000
-#define GENERATIONS 1000
+#define GENERATIONS 10000
 #endif
 
 // Create board and a temporary update board
@@ -43,15 +46,19 @@ void initBoard() {
     }
 }
 
-void updateBoard() {
-    // Copy to to a temporary board
-    memcpy(previousBoard, board, sizeof(board));
+void* updateRow(void* arg) {
+    // Get start and end for this thread
+    int startIndex = (int)(long)arg * BOARD_SIZE*BOARD_SIZE/THREADS;
+    int endIndex = ((int)(long)arg+1) * BOARD_SIZE*BOARD_SIZE/THREADS;
 
-    // Update the state of all cells (yes this could be optimized by only updating cells that are alive or have alive neighbouring cells)
-    for (size_t x = 0; x < BOARD_SIZE; x++)
-    {
-        for (size_t y = 0; y < BOARD_SIZE; y++)
-        {
+    // Update all cells this thread is responsible for
+    for(int i = startIndex; i<endIndex; i++){
+        // Make sure i is within board
+        if(i < BOARD_SIZE*BOARD_SIZE){
+            // Get coordinates
+            int x = i % BOARD_SIZE;
+            int y = i / BOARD_SIZE;
+
             bool state = previousBoard[x][y];
 
             // Get adjacent coordinates with wrapping
@@ -85,6 +92,22 @@ void updateBoard() {
         }
     }
 
+    return NULL;
+}
+
+void updateBoard(pthread_t threads[]) {
+    // Copy to to a temporary board
+    memcpy(previousBoard, board, sizeof(board));
+
+    // Send job to each thread
+    for(int i = 0; i<THREADS; i++){
+        pthread_create(&threads[i], NULL, updateRow, (void*)(long)i);
+    }
+
+    // Wait for all threads to finish
+    for(int i = 0; i<THREADS; i++){
+        pthread_join(threads[i], NULL);
+    }
 }
 
 #ifndef BENCHMARKING
@@ -113,6 +136,9 @@ void drawLabel(){
 #endif
 
 int main(void) {
+    // Setup multithreading
+    pthread_t threads[THREADS];
+
     // The graphical part
     #ifndef BENCHMARKING
 
@@ -128,7 +154,7 @@ int main(void) {
         // Update and draw
         BeginDrawing();
         ClearBackground(WHITE);
-        updateBoard();
+        updateBoard(threads);
         drawBoard();
         drawLabel();
         EndDrawing();
@@ -141,16 +167,23 @@ int main(void) {
 
     // The benchmarking part
     #ifdef BENCHMARKING
+
     // Start recording time
-    clock_t clock_start = clock();
+    struct timespec start, finish;
+    double elapsed;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     // Update board generation amount of times
     for(size_t i = 0; i<GENERATIONS; i++){
-        updateBoard();
+        updateBoard(threads);
     }
 
     // Stop recording time and output result
-    clock_t clock_end = clock();
-    printf("Completed %d generations in %f seconds\n%f generations every second\n", GENERATIONS, (double)(clock_end - clock_start) / CLOCKS_PER_SEC, (double)GENERATIONS / ((double)(clock_end - clock_start) / CLOCKS_PER_SEC));
+    clock_gettime(CLOCK_MONOTONIC, &finish);
+
+    elapsed = (finish.tv_sec - start.tv_sec);
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0;
+    printf("Completed %d generations in %f seconds\n%f generations every second\n", GENERATIONS, elapsed, (double)GENERATIONS / elapsed);
     #endif
 }
