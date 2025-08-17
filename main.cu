@@ -1,4 +1,4 @@
-#define BENCHMARKING
+//#define BENCHMARKING
 
 #include <curand_kernel.h>
 
