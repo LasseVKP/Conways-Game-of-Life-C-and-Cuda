@@ -30,7 +30,7 @@ int generation = 0;
 #include <time.h>
 // Set size and generation amount
 #define BOARD_SIZE 1000
-#define GENERATIONS 10000
+#define GENERATIONS 100000
 #endif
 
 // Create board and a temporary update board
